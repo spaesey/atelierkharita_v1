@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { createBooking, type BookingRecord } from "@/lib/bookings";
 
-const OWNER_EMAIL = "atelierkharita@gmail.com";
+const OWNER_EMAIL = process.env.BOOKING_NOTIFY_EMAIL || "atelierkharita@gmail.com";
 
 type BookingPayload = {
   name: string;
@@ -16,10 +16,13 @@ type BookingPayload = {
 };
 
 async function sendOwnerNotification(record: BookingRecord, saveError?: unknown) {
-  const { EMAIL_SMTP_HOST, EMAIL_SMTP_PORT, EMAIL_SMTP_USER, EMAIL_SMTP_PASS, EMAIL_FROM } =
-    process.env;
+  const smtpHost = process.env.EMAIL_SMTP_HOST?.trim();
+  const smtpPort = process.env.EMAIL_SMTP_PORT?.trim();
+  const smtpUser = process.env.EMAIL_SMTP_USER?.trim();
+  const smtpPass = process.env.EMAIL_SMTP_PASS?.trim();
+  const emailFrom = process.env.EMAIL_FROM?.trim();
 
-  if (!EMAIL_SMTP_HOST || !EMAIL_SMTP_USER || !EMAIL_SMTP_PASS) {
+  if (!smtpHost || !smtpUser || !smtpPass) {
     console.warn(
       "[bookings] SMTP is not configured (see .env.example) — skipping owner notification email."
     );
@@ -27,10 +30,10 @@ async function sendOwnerNotification(record: BookingRecord, saveError?: unknown)
   }
 
   const transporter = nodemailer.createTransport({
-    host: EMAIL_SMTP_HOST,
-    port: Number(EMAIL_SMTP_PORT ?? 587),
-    secure: Number(EMAIL_SMTP_PORT) === 465,
-    auth: { user: EMAIL_SMTP_USER, pass: EMAIL_SMTP_PASS },
+    host: smtpHost,
+    port: Number(smtpPort ?? 587),
+    secure: Number(smtpPort) === 465,
+    auth: { user: smtpUser, pass: smtpPass },
   });
 
   const lines = [
@@ -47,7 +50,7 @@ async function sendOwnerNotification(record: BookingRecord, saveError?: unknown)
   ];
 
   await transporter.sendMail({
-    from: EMAIL_FROM || EMAIL_SMTP_USER,
+    from: emailFrom || smtpUser,
     to: OWNER_EMAIL,
     subject: `New booking from ${record.name}`,
     text: lines.join("\n"),

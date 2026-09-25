@@ -42,6 +42,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function BusinessSettingsEditor({ initial }: { initial: BusinessSettings }) {
   const [settings, setSettings] = useState(initial);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [testEmailStatus, setTestEmailStatus] = useState<
+    | { state: "idle" | "sending" }
+    | { state: "success"; message: string }
+    | { state: "error"; message: string }
+  >({ state: "idle" });
 
   function update(patch: Partial<BusinessSettings>) {
     setSettings((prev) => ({ ...prev, ...patch }));
@@ -64,6 +69,24 @@ export default function BusinessSettingsEditor({ initial }: { initial: BusinessS
       setStatus(res.ok ? "saved" : "error");
     } catch {
       setStatus("error");
+    }
+  }
+
+  async function handleTestEmail() {
+    setTestEmailStatus({ state: "sending" });
+    try {
+      const res = await fetch("/api/admin/test-email", { method: "POST" });
+      const data = (await res.json().catch(() => null)) as { sentTo?: string; error?: string } | null;
+      if (!res.ok) {
+        setTestEmailStatus({ state: "error", message: data?.error || "Failed to send test email" });
+        return;
+      }
+      setTestEmailStatus({ state: "success", message: `Sent to ${data?.sentTo || "the configured recipient"}` });
+    } catch (error) {
+      setTestEmailStatus({
+        state: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -128,6 +151,28 @@ export default function BusinessSettingsEditor({ initial }: { initial: BusinessS
           onChange={(value) => updateSocial({ whatsapp: value })}
           hint="استخدم رابط wa.me، مثل https://wa.me/31644469920. اتركه فارغًا (أو #) لإخفاء الأيقونة."
         />
+      </Section>
+
+      <Section title="اختبار البريد الإلكتروني">
+        <p className="text-sm leading-6 text-neutral-500">
+          أرسل رسالة قصيرة إلى عنوان إشعارات الحجوزات الحالي للتأكد من إعدادات SMTP.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleTestEmail}
+            disabled={testEmailStatus.state === "sending"}
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {testEmailStatus.state === "sending" ? "جارٍ الإرسال…" : "إرسال رسالة اختبار"}
+          </button>
+          {testEmailStatus.state === "success" && (
+            <span className="text-sm font-semibold text-green-600">{testEmailStatus.message}</span>
+          )}
+          {testEmailStatus.state === "error" && (
+            <span className="text-sm font-semibold text-red-600">{testEmailStatus.message}</span>
+          )}
+        </div>
       </Section>
 
       <div className="sticky bottom-4 flex items-center gap-3 rounded-full border border-neutral-200 bg-white/95 p-2 ps-5 shadow-lg backdrop-blur">
